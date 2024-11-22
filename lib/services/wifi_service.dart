@@ -2,7 +2,7 @@ import 'package:wifi_iot/wifi_iot.dart';
 
 class WifiService {
   static Future<bool> requestPermissions() async {
-    return true; 
+    return true;
   }
 
   // ignore: deprecated_member_use
@@ -17,14 +17,23 @@ class WifiService {
   }
 
   // ignore: deprecated_member_use
-  static Future<bool> connectToWifi(WifiNetwork network, String password, bool hidden) async {
+  static Future<bool> connectToWifi(
+      // ignore: deprecated_member_use
+      String ssid,
+      String password,
+      bool hidden) async {
     bool isConnected = await WiFiForIoTPlugin.connect(
-      network.ssid ?? '',
+      // network.ssid ?? '',
+      ssid = ssid,
       password: password,
       joinOnce: true,
       isHidden: hidden,
       security: NetworkSecurity.WPA,
     );
     return isConnected;
+  }
+
+  static Future<bool> disconnectWifi() {
+    return WiFiForIoTPlugin.disconnect();
   }
 }

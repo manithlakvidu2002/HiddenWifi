@@ -1,4 +1,3 @@
-// ignore: file_names
 import 'package:esp32/services/wifi_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,13 +7,12 @@ class WifiScanScreen extends StatefulWidget {
   const WifiScanScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _WifiScanScreenState createState() => _WifiScanScreenState();
 }
 
 class _WifiScanScreenState extends State<WifiScanScreen> {
-  // ignore: deprecated_member_use
   List<WifiNetwork> _wifiList = [];
+  String? _connectedSsid;
   String? _selectedSsid;
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -38,14 +36,12 @@ class _WifiScanScreenState extends State<WifiScanScreen> {
   }
 
   Future<void> _scanWifi() async {
-    // ignore: deprecated_member_use
     List<WifiNetwork> networks = await WifiService.scanWifi();
     setState(() {
       _wifiList = networks;
     });
   }
 
-  // ignore: deprecated_member_use
   void _showPasswordDialog(WifiNetwork? network) {
     _selectedSsid = network?.ssid;
     _ssidController.text = _selectedSsid ?? '';
@@ -59,42 +55,46 @@ class _WifiScanScreenState extends State<WifiScanScreen> {
           title: Text(_selectedSsid != null
               ? 'Enter Password for $_selectedSsid'
               : 'Connect to Hidden Network'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_selectedSsid == null)
-                TextField(
-                  controller: _ssidController,
-                  decoration: const InputDecoration(
-                    labelText: 'SSID',
-                    hintText: 'Enter network name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter Wi-Fi password',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              Row(
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setDialogState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Checkbox(
-                    value: hidden,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        hidden = value ?? false;
-                      });
-                    },
+                  if (_selectedSsid == null)
+                    TextField(
+                      controller: _ssidController,
+                      decoration: const InputDecoration(
+                        labelText: 'SSID',
+                        hintText: 'Enter network name',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      hintText: 'Enter Wi-Fi password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
                   ),
-                  const Text('Hidden Network'),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: hidden,
+                        onChanged: (bool? value) {
+                          setDialogState(() {
+                            hidden = value ?? false;
+                          });
+                        },
+                      ),
+                      const Text('Hidden Network'),
+                    ],
+                  ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
           actions: [
             TextButton(
@@ -125,15 +125,18 @@ class _WifiScanScreenState extends State<WifiScanScreen> {
     String password = _passwordController.text;
 
     bool isConnected = await WifiService.connectToWifi(
-      // ignore: deprecated_member_use
-      ssid as WifiNetwork, password,hidden,
+      ssid,
+      password,
+      hidden,
     );
 
     if (isConnected) {
+      setState(() {
+        _connectedSsid = ssid;
+      });
       if (kDebugMode) {
         print('Connected to $ssid');
       }
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connected to $ssid')),
       );
@@ -141,9 +144,30 @@ class _WifiScanScreenState extends State<WifiScanScreen> {
       if (kDebugMode) {
         print('Failed to connect to $ssid');
       }
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to connect to $ssid')),
+      );
+    }
+  }
+
+  Future<void> _disconnectFromWifi() async {
+    bool isDisconnected = await WifiService.disconnectWifi();
+    if (isDisconnected) {
+      setState(() {
+        _connectedSsid = null;
+      });
+      if (kDebugMode) {
+        print('Disconnected from Wi-Fi');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Disconnected from Wi-Fi')),
+      );
+    } else {
+      if (kDebugMode) {
+        print('Failed to disconnect');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to disconnect')),
       );
     }
   }
@@ -167,9 +191,22 @@ class _WifiScanScreenState extends State<WifiScanScreen> {
             : ListView.builder(
                 itemCount: _wifiList.length,
                 itemBuilder: (context, index) {
-                  // ignore: deprecated_member_use
                   WifiNetwork network = _wifiList[index];
+                  bool isConnected = _connectedSsid == network.ssid;
+
+                  Color signalColor = Colors.grey;
+                  if (network.level != null) {
+                    if (network.level! > -60) {
+                      signalColor = Colors.green;
+                    } else if (network.level! > -80) {
+                      signalColor = Colors.amber;
+                    } else {
+                      signalColor = Colors.red;
+                    }
+                  }
+
                   return Card(
+                    color: isConnected ? Colors.green[50] : null,
                     margin: const EdgeInsets.symmetric(
                       vertical: 8.0,
                       horizontal: 16.0,
@@ -177,19 +214,33 @@ class _WifiScanScreenState extends State<WifiScanScreen> {
                     child: ListTile(
                       contentPadding: const EdgeInsets.all(12.0),
                       leading: Icon(
-                        network.level != null && network.level! > -70
-                            ? Icons.signal_wifi_4_bar
-                            : Icons.signal_wifi_off,
-                        color: network.level != null && network.level! > -70
-                            ? Colors.green
-                            : Colors.red,
+                        Icons.signal_wifi_4_bar,
+                        color: isConnected ? Colors.green : signalColor,
                       ),
                       title: Text(
                         network.ssid ?? 'Unknown SSID',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isConnected ? Colors.green : Colors.black,
+                        ),
                       ),
-                      subtitle: Text('Signal Strength: ${network.level} dBm'),
-                      onTap: () => _showPasswordDialog(network),
+                      subtitle: Text(
+                        'Signal Strength: ${network.level ?? 'Unknown'} dBm',
+                        style: TextStyle(
+                          color: isConnected ? Colors.green : Colors.black,
+                        ),
+                      ),
+                      trailing: isConnected
+                          ? ElevatedButton(
+                              onPressed: _disconnectFromWifi,
+                              child: const Text('Disconnect'),
+                            )
+                          : null,
+                      onTap: () {
+                        if (!isConnected) {
+                          _showPasswordDialog(network);
+                        }
+                      },
                     ),
                   );
                 },
