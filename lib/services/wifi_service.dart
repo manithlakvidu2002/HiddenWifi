@@ -1,23 +1,22 @@
 import 'package:wifi_iot/wifi_iot.dart';
 
 class WifiService {
-  // Request location permissions to scan Wi-Fi
   static Future<bool> requestPermissions() async {
-    // Implement permission request logic if necessary
-    return true;  // Assuming permissions are granted for simplicity
+    return true; 
   }
 
-  // Scan for available Wi-Fi networks
+  // ignore: deprecated_member_use
   static Future<List<WifiNetwork>> scanWifi() async {
     bool isEnabled = await WiFiForIoTPlugin.isEnabled();
     if (!isEnabled) {
       await WiFiForIoTPlugin.setEnabled(true);
     }
 
+    // ignore: deprecated_member_use
     return await WiFiForIoTPlugin.loadWifiList();
   }
 
-  // Connect to the selected network using SSID and user-provided password
+  // ignore: deprecated_member_use
   static Future<bool> connectToWifi(WifiNetwork network, String password, bool hidden) async {
     bool isConnected = await WiFiForIoTPlugin.connect(
       network.ssid ?? '',
